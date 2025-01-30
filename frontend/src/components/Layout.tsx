@@ -3,10 +3,28 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, Home, Package, Users } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import {jwtDecode} from 'jwt-decode';
+
+interface DecodedToken {
+  userId: number;
+  role: string;
+  name: string;
+  exp: number;
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { token, logout } = useAuth();
   const navigate = useNavigate();
+  let user: DecodedToken | null = null;
+
+  if (token) {
+    try {
+      user = jwtDecode<DecodedToken>(token);
+    } catch (error) {
+      console.error('Invalid token:', error);
+      localStorage.removeItem('token');
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors">

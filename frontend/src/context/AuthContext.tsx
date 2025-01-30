@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '../types';
-import { users } from '../data/mock';
+ 
 
 interface AuthContextType {
-  user: User | null;
+  token: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
@@ -12,33 +11,49 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    const savedToken = localStorage.getItem('token');
+    if (savedToken) {
+      setToken(savedToken);
     }
     setLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
-    const foundUser = users.find(u => u.email === email);
-    if (!foundUser) {
-      throw new Error('User not found');
+    try {
+      const response = await fetch('http://localhost:3030/api/users/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ Email: email, PasswordHash: password })
+      });
+
+      if (!response.ok) {
+        throw new Error('Login failed');
+      }
+
+      const data = await response.json();
+ 
+      const { token } = data;
+      setToken(token);
+      localStorage.setItem('token', token);
+    } catch (error) {
+      console.error('Error during login:', error);
+      throw new Error('Login failed');
     }
-    setUser(foundUser);
-    localStorage.setItem('user', JSON.stringify(foundUser));
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
+    setToken(null);
+    localStorage.removeItem('token');
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ token, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -16,6 +16,7 @@ export function Login() {
       await login(email, password);
       navigate('/');
     } catch (err) {
+      console.log(err)
       setError('Credenciales inválidas');
     }
   };
