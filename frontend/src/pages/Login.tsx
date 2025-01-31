@@ -17,7 +17,7 @@ export function Login() {
       navigate('/');
     } catch (err) {
       console.log(err)
-      setError('Credenciales inválidas');
+      setError('Creedenciales inválidas o inactivas');
     }
   };
 

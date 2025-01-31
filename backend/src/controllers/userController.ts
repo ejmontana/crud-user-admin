@@ -9,10 +9,37 @@ import { stat } from 'fs';
 export const userController = {
   async register(req: Request, res: Response) {
     try {
-      const { Usuario, NombreCompleto, Telefono, Email, PasswordHash, RoleID, EstadoID = 1, UsuarioCreaID, FechaModificacion, UsuarioModificaID }: UsuarioDetalle = req.body;
-      
+      const {
+        Usuario,
+        NombreCompleto,
+        Telefono,
+        Email,
+        PasswordHash,
+        RoleID,
+        EstadoID = 1,
+        UsuarioCreaID,
+        FechaModificacion,
+        UsuarioModificaID
+      }: UsuarioDetalle = req.body;
+  
+      const existingEmail = await pool.request()
+        .input('Email', Email)
+        .query('SELECT TOP 1 Email FROM Usuarios WHERE Email = @Email');
+  
+      if (existingEmail.recordset.length > 0) {
+        return res.status(400).json({ message: 'El Email esta en uso', status: 400 });
+      }
+  
+      const existingUsuario = await pool.request()
+        .input('Usuario', Usuario)
+        .query('SELECT TOP 1 Usuario FROM Usuarios WHERE Usuario = @Usuario');
+  
+      if (existingUsuario.recordset.length > 0) {
+        return res.status(400).json({ message: 'El Usuario esta en uso', status: 400 });
+      }
+  
       const hashedPassword = crypto.createHash('sha256').update(PasswordHash).digest();
-      
+  
       const result = await pool.request()
         .input('Usuario', Usuario)
         .input('NombreCompleto', NombreCompleto)
@@ -26,105 +53,212 @@ export const userController = {
         .input('FechaModificacion', FechaModificacion)
         .input('UsuarioModificaID', UsuarioModificaID)
         .query(`
-          INSERT INTO Usuarios (Usuario, NombreCompleto, Telefono, PasswordHash, Email, RoleID, EstadoID, FechaCreacion, UsuarioCreaID, FechaModificacion, UsuarioModificaID)
-          VALUES (@Usuario, @NombreCompleto, @Telefono, @PasswordHash, @Email, @RoleID, @EstadoID, @FechaCreacion, @UsuarioCreaID, @FechaModificacion, @UsuarioModificaID); 
+          INSERT INTO Usuarios (
+            Usuario,
+            NombreCompleto,
+            Telefono,
+            PasswordHash,
+            Email,
+            RoleID,
+            EstadoID,
+            FechaCreacion,
+            UsuarioCreaID,
+            FechaModificacion,
+            UsuarioModificaID
+          ) VALUES (
+            @Usuario,
+            @NombreCompleto,
+            @Telefono,
+            @PasswordHash,
+            @Email,
+            @RoleID,
+            @EstadoID,
+            @FechaCreacion,
+            @UsuarioCreaID,
+            @FechaModificacion,
+            @UsuarioModificaID
+          );
         `);
-
-      res.status(201).json({ message: 'User created successfully', id: result.recordset[0].id });
+  
+      return res.status(201).json({ message: 'User created successfully', status: 201 });
     } catch (error) {
       console.log(error);
-      res.status(500).json({ message: 'Error creating user', error });
+      return res.status(500).json({ message: 'Error creating user', error, status: 500 });
     }
-},
+  },
 
-async login(req: Request, res: Response) {
+  async login(req: Request, res: Response) {
+    try {
+      const { Email, PasswordHash: inputPassword } = req.body as { Email: string, PasswordHash: string };
+      
+      const result = await pool.request()
+        .input('email', Email)
+        .query('SELECT * FROM Usuarios WHERE Email = @email');
+      console.log(result.recordset[0])
+      const user = result.recordset[0] as UsuarioDetalle;
+  
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid credentials', status: 401 });
+      }
+  
+      // Check if the user is active
+      if (user.EstadoID !== 1) {
+        return res.status(403).json({ message: 'User is not active', status: 403 });
+      }
+  
+      const inputPasswordHash = crypto.createHash('sha256').update(inputPassword).digest('hex');
+      const storedPasswordHash = Buffer.from(user.PasswordHash).toString('hex');
+  
+      if (inputPasswordHash !== storedPasswordHash) {
+        return res.status(401).json({ message: 'Invalid credentials', status: 401 });
+      }
+  
+      const { PasswordHash, ...userWithoutPassword } = user;
+  
+      const token = jwt.sign(
+        { userWithoutPassword },
+        process.env.JWT_SECRET!,
+        { expiresIn: '12h' }
+      );
+  
+      return res.json({ token, status: 200 });
+      
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: 'Error during login', error });
+    }
+  },
+
+async getAllUsers(req: Request, res: Response) {
   try {
-    const { Email, PasswordHash: inputPassword } = req.body as { Email: string, PasswordHash: string };
-    
-    const result = await pool.request()
-      .input('email', Email)
-      .query('SELECT * FROM Usuarios WHERE Email = @email');
-    console.log(result.recordset[0])
-    const user = result.recordset[0] as UsuarioDetalle;
-
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
+      const query = `
+          SELECT 
+              US.UserID, 
+              US.Usuario, 
+              US.NombreCompleto, 
+              US.Telefono, 
+              US.Email, 
+              US.RoleID, 
+              US.EstadoID, 
+              RO.NombreRol, 
+              ES.Descripcion AS EstadoDescripcion, 
+              US.FechaCreacion, 
+              COALESCE(US2.NombreCompleto, 'No asignado') AS CreadoPor, 
+              COALESCE(US3.NombreCompleto, 'No asignado') AS ModificadoPor, 
+              US.FechaModificacion
+          FROM 
+              Usuarios US
+          LEFT JOIN 
+              Roles RO ON US.RoleID = RO.RoleID 
+          LEFT JOIN 
+              Estado ES ON US.EstadoID = ES.EstadoID 
+          LEFT JOIN 
+              Usuarios US2 ON US2.UserID = US.UsuarioCreaID 
+          LEFT JOIN 
+              Usuarios US3 ON US3.UserID = US.UsuarioModificaID
+      `;
 
   
-    const inputPasswordHash = crypto.createHash('sha256').update(inputPassword).digest('hex');
-    const storedPasswordHash = Buffer.from(user.PasswordHash).toString('hex');
+      const result = await pool.request().query(query);
 
-    if (inputPasswordHash !== storedPasswordHash) {
-      return res.status(401).json({ message: 'Invalid credentials', status: 401 });
-    }
-
-    const { PasswordHash, ...userWithoutPassword } = user;
-
-    const token = jwt.sign(
-      { userWithoutPassword },
-      process.env.JWT_SECRET!,
-      { expiresIn: '12h' }
-    );
-
-    return res.json({ token, status: 200 });
-    
+      res.json(result.recordset);
   } catch (error) {
-    console.log(error);
-    return res.status(500).json({ message: 'Error during login', error });
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Error fetching users', error: error.message });
   }
 },
 
-  async getAllUsers(req: Request, res: Response) {
-    try {
-      const result = await pool.request()
-        .query('SELECT id, username, email, role, createdAt FROM Users');
-      
-      res.json(result.recordset);
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching users', error });
+async getUserById(req: Request, res: Response) {
+  try {
+    const result = await pool.request()
+      .input('id', req.params.id)
+      .query('SELECT id, username, email, role, createdAt FROM Users WHERE id = @id');
+
+    if (!result.recordset[0]) {
+      return res.status(404).json({ message: 'User not found' });
     }
-  },
 
-  async getUserById(req: Request, res: Response) {
-    try {
-      const result = await pool.request()
-        .input('id', req.params.id)
-        .query('SELECT id, username, email, role, createdAt FROM Users WHERE id = @id');
+    res.json(result.recordset[0]);
+  } catch (error) {
+    return res.status(500).json({ message: 'Error fetching user', error });
+  }
+},
 
-      if (!result.recordset[0]) {
-        return res.status(404).json({ message: 'User not found' });
-      }
+async updateUser(req: Request, res: Response) {
+  try {
+    const {
+      Usuario,
+      NombreCompleto,
+      Telefono,
+      Email,
+      PasswordHash,
+      RoleID,
+      EstadoID,
+      UsuarioModificaID
+    }: UsuarioDetalle = req.body;
 
-      res.json(result.recordset[0]);
-    } catch (error) {
-      return res.status(500).json({ message: 'Error fetching user', error });
+    const existingEmail = await pool.request()
+      .input('Email', Email)
+      .input('UserID', req.params.id)
+      .query('SELECT TOP 1 Email FROM Usuarios WHERE Email = @Email AND UserID != @UserID');
+
+    if (existingEmail.recordset.length > 0) {
+      return res.status(400).json({ message: 'El Email esta en uso', status: 400 });
     }
-  },
 
-  async updateUser(req: Request, res: Response) {
-    try {
-      const { username, email } = req.body;
-      
-      const result = await pool.request()
-        .input('id', req.params.id)
-        .input('username', username)
-        .input('email', email)
-        .query(`
-          UPDATE Users 
-          SET username = @username, email = @email 
-          WHERE id = @id
-        `);
+    const existingUsuario = await pool.request()
+      .input('Usuario', Usuario)
+      .input('UserID', req.params.id)
+      .query('SELECT TOP 1 Usuario FROM Usuarios WHERE Usuario = @Usuario AND UserID != @UserID');
 
-      if (result.rowsAffected[0] === 0) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-
-      res.json({ message: 'User updated successfully' });
-    } catch (error) {
-      res.status(500).json({ message: 'Error updating user', error });
+    if (existingUsuario.recordset.length > 0) {
+      return res.status(400).json({ message: 'El Usuario esta en uso', status: 400 });
     }
-  },
+
+    let query = `
+      UPDATE Usuarios 
+      SET 
+        Usuario = @Usuario,
+        NombreCompleto = @NombreCompleto,
+        Telefono = @Telefono,
+        Email = @Email,
+        RoleID = @RoleID,
+        EstadoID = @EstadoID,
+        FechaModificacion = @FechaModificacion,
+        UsuarioModificaID = @UsuarioModificaID
+    `;
+
+    const request = pool.request()
+      .input('UserID', req.params.id)
+      .input('Usuario', Usuario)
+      .input('NombreCompleto', NombreCompleto)
+      .input('Telefono', Telefono)
+      .input('Email', Email)
+      .input('RoleID', RoleID)
+      .input('EstadoID', EstadoID)
+      .input('FechaModificacion', new Date())
+      .input('UsuarioModificaID', UsuarioModificaID);
+
+    if (PasswordHash) {
+      const hashedPassword = crypto.createHash('sha256').update(PasswordHash).digest();
+      query += `, PasswordHash = @PasswordHash`;
+      request.input('PasswordHash', hashedPassword);
+    }
+
+    query += ` WHERE UserID = @UserID`;
+
+    const result = await request.query(query);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    return res.json({ message: 'User updated successfully' });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: 'Error updating user', error, status: 500 });
+  }
+},
 
   async deleteUser(req: Request, res: Response) {
     try {

@@ -1,8 +1,33 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
-import { products, users } from '../data/mock';
+import { products } from '../data/mock';
 import { Product, User } from '../types';
 import { Plus, Edit, Trash, UserCog, Package2, Check, X } from 'lucide-react';
+import { jwtDecode } from 'jwt-decode';
+import { useAuth } from '../context/AuthContext';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+import moment from 'moment';
+
+const MySwal = withReactContent(Swal);
+
+interface DecodedToken {
+  exp: number;
+  iat: number;
+  userWithoutPassword: {
+    Email: string;
+    EstadoID: number;
+    FechaCreacion: string;
+    FechaModificacion: string | null;
+    NombreCompleto: string;
+    RoleID: number;
+    Telefono: number;
+    UserID: number;
+    Usuario: string;
+    UsuarioCreaID: number;
+    UsuarioModificaID: number | null;
+  };
+}
 
 export function Admin() {
   const [view, setView] = useState<'products' | 'users'>('users');
@@ -10,6 +35,24 @@ export function Admin() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showProductForm, setShowProductForm] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
+  const { token } = useAuth();
+
+  const [allUser, setAllUser] = useState([]);
+
+  const [errorField, setErrorField] = useState('');
+
+
+  let user: DecodedToken | null = null;
+
+  if (token) {
+    try {
+      user = jwtDecode<DecodedToken>(token);
+
+    } catch (error) {
+      console.error('Invalid token:', error);
+      localStorage.removeItem('token');
+    }
+  }
 
   const handleSubmitProduct = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,12 +60,114 @@ export function Admin() {
     setEditingProduct(null);
   };
 
-  const handleSubmitUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    setShowUserForm(false);
-    setEditingUser(null);
-  };
 
+  const handleSubmitUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorField('');
+    const formData = new FormData(e.target as HTMLFormElement);
+    const data = {
+      Usuario: formData.get('Usuario') as string,
+      NombreCompleto: formData.get('NombreCompleto') as string,
+      Telefono: formData.get('Telefono') as string,
+      Email: formData.get('Email') as string,
+      PasswordHash: formData.get('Password') as string,
+      RoleID: formData.get('RoleID') as string,
+      EstadoID: Number(formData.get('EstadoID')) || 1,
+      UsuarioCreaID: user.userWithoutPassword.UserID,
+      FechaModificacion: editingUser ? new Date().toISOString() : null,
+      UsuarioModificaID: editingUser ? user.userWithoutPassword.UserID : null
+    };
+  
+    const url = editingUser
+      ? `http://localhost:3030/api/users/${editingUser.UserID}`
+      : 'http://localhost:3030/api/users/register';
+    const method = editingUser ? 'PUT' : 'POST';
+  
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.message?.includes('El Email esta en uso')) setErrorField('Email');
+        if (errorData.message?.includes('El Usuario esta en uso')) setErrorField('Usuario');
+        MySwal.fire({
+          title: 'Validaciones',
+          text: errorData.message || 'Error creating/updating user',
+          icon: 'error',
+          confirmButtonText: 'Cerrar',
+          customClass: {
+            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+          }
+        });
+        return;
+      }
+      const result = await response.json();
+      console.log('User created/updated:', result);
+      setShowUserForm(false);
+      setEditingUser(null);
+      MySwal.fire({
+        title: 'Validaciones',
+        text: editingUser ? 'Usuario actualizado correctamente' : 'Usuario creado correctamente',
+        icon: 'success',
+        confirmButtonText: 'Cerrar',
+        customClass: {
+          confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+          popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+        }
+      });
+      // Refresh the user list
+      fetchUsers();
+    } catch (error) {
+      console.error('Error:', error);
+      MySwal.fire({
+        title: 'Error',
+        text: 'Error creating/updating user',
+        icon: 'error',
+        confirmButtonText: 'Cerrar',
+        customClass: {
+          confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+          popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+        }
+      });
+    }
+  };
+  
+
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('http://localhost:3030/api/users/alluser', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Error fetching users');
+      }
+      const data = await response.json();
+      setAllUser(data);
+    } catch (error) {
+      console.error('Error:', error);
+      MySwal.fire({
+        title: 'Error',
+        text: 'Error fetching users',
+        icon: 'error',
+        confirmButtonText: 'Close',
+        customClass: {
+          confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+          popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors'
+        }
+      });
+    }
+  };
+  
+  useEffect(() => {
+    fetchUsers();
+  }, []);
   return (
     <Layout>
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
@@ -33,23 +178,21 @@ export function Admin() {
             </h2>
             <div className="mt-4 space-x-4">
               <button
-                onClick={() => setView('users')}
-                className={`inline-flex items-center px-4 py-2 rounded-md transition-colors ${
-                  view === 'users'
+                onClick={() => { setShowProductForm(false); setView('users') }}
+                className={`inline-flex items-center px-4 py-2 rounded-md transition-colors ${view === 'users'
                     ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
+                  }`}
               >
                 <UserCog className="w-4 h-4 mr-2" />
                 Usuarios
               </button>
               <button
-                onClick={() => setView('products')}
-                className={`inline-flex items-center px-4 py-2 rounded-md transition-colors ${
-                  view === 'products'
+                onClick={() => { setShowUserForm(false); setView('products') }}
+                className={`inline-flex items-center px-4 py-2 rounded-md transition-colors ${view === 'products'
                     ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
+                  }`}
               >
                 <Package2 className="w-4 h-4 mr-2" />
                 Productos
@@ -135,71 +278,111 @@ export function Admin() {
           </form>
         )}
 
-        {showUserForm && (
-          <form onSubmit={handleSubmitUser} className="mb-6 p-4 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Nombre
-                </label>
-                <input
-                  type="text"
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
-                  defaultValue={editingUser?.name}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
-                  defaultValue={editingUser?.email}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Rol
-                </label>
-                <select
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
-                  defaultValue={editingUser?.role}
-                >
-                  <option value="user">Usuario</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Estado
-                </label>
-                <select
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
-                  defaultValue={editingUser?.active ? 'active' : 'inactive'}
-                >
-                  <option value="active">Activo</option>
-                  <option value="inactive">Inactivo</option>
-                </select>
-              </div>
+{showUserForm && (
+        <form onSubmit={handleSubmitUser} className="mb-6 p-4 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700">
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Usuario
+              </label>
+              <input
+                type="text"
+                name="Usuario"
+                defaultValue={editingUser?.Usuario || ''}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white ${
+                  errorField === 'Usuario' ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
+                }`}
+              />
             </div>
-            <div className="mt-4 flex justify-end space-x-2">
-              <button
-                type="button"
-                onClick={() => setShowUserForm(false)}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors"
-              >
-                Guardar
-              </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Nombre Completo
+              </label>
+              <input
+                type="text"
+                name="NombreCompleto"
+                defaultValue={editingUser?.NombreCompleto || ''}
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+              />
             </div>
-          </form>
-        )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Teléfono
+              </label>
+              <input
+                type="number"
+                name="Telefono"
+                defaultValue={editingUser?.Telefono || ''}
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Email
+              </label>
+              <input
+                type="email"
+                name="Email"
+                defaultValue={editingUser?.Email || ''}
+                className={`mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white ${
+                  errorField === 'Email' ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
+                }`}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Password
+              </label>
+              <input
+                type="password"
+                name="Password"
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Rol
+              </label>
+              <select
+                name="RoleID"
+                defaultValue={editingUser?.RoleID || '1'}
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+              >
+                <option value="1">Administrador</option>
+                <option value="2">Usuario</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Estado
+              </label>
+              <select
+                name="EstadoID"
+                defaultValue={editingUser?.EstadoID || '1'}
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+              >
+                <option value="1">Activo</option>
+                <option value="2">Inactivo</option>
+              </select>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end space-x-2">
+            <button
+              type="button"
+              onClick={() => setShowUserForm(false)}
+              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors"
+            >
+              Guardar
+            </button>
+          </div>
+        </form>
+      )}
 
         <div className="overflow-x-auto">
           {view === 'products' ? (
@@ -275,6 +458,12 @@ export function Admin() {
                     Usuario
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Nombre Completo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Telefono
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Rol
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -284,51 +473,80 @@ export function Admin() {
                     Fecha de Creación
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Creado Por
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Acciones
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {users.map((user) => (
-                  <tr key={user.id}>
+                {allUser.map((user) => (
+                  <tr key={user.UserID}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {user.name}
+                            {user.Usuario}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {user.email}
+                            {user.Email}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.role === 'admin'
+                      <div className="flex items-center">
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {user.NombreCompleto}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {user.Telefono}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.NombreRol === "Administrador"
                           ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
                           : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      }`}>
-                        {user.role === 'admin' ? 'Administrador' : 'Usuario'}
+                        }`}>
+                        {user.NombreRol}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.active
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.EstadoDescripcion === "Activo"
                           ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                           : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
-                        {user.active ? (
+                        }`}>
+                        {user.EstadoDescripcion === "Activo" ? (
                           <Check className="w-4 h-4 mr-1" />
                         ) : (
                           <X className="w-4 h-4 mr-1" />
                         )}
-                        {user.active ? 'Activo' : 'Inactivo'}
+                        {user.EstadoDescripcion}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {user.createdAt}
+                      {moment(user.FechaCreacion).format('DD/MM/YYYY')}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {user.CreadoPor}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
                         onClick={() => {
@@ -339,7 +557,7 @@ export function Admin() {
                       >
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button 
+                      <button
                         className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
                       >
                         <Trash className="w-4 h-4" />
@@ -352,6 +570,8 @@ export function Admin() {
           )}
         </div>
       </div>
+
+
     </Layout>
   );
 }

@@ -6,10 +6,21 @@ import { ThemeToggle } from './ThemeToggle';
 import {jwtDecode} from 'jwt-decode';
 
 interface DecodedToken {
-  userId: number;
-  role: string;
-  name: string;
   exp: number;
+  iat: number;
+  userWithoutPassword: {
+    Email: string;
+    EstadoID: number;
+    FechaCreacion: string;
+    FechaModificacion: string | null;
+    NombreCompleto: string;
+    RoleID: number;
+    Telefono: number;
+    UserID: number;
+    Usuario: string;
+    UsuarioCreaID: number;
+    UsuarioModificaID: number | null;
+  };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -20,6 +31,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   if (token) {
     try {
       user = jwtDecode<DecodedToken>(token);
+      
     } catch (error) {
       console.error('Invalid token:', error);
       localStorage.removeItem('token');
@@ -50,7 +62,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <Package className="w-4 h-4 mr-2" />
                   Productos
                 </button>
-                {user?.role === 'admin' && (
+                {user?.userWithoutPassword.RoleID === 1 && (
                   <button
                     onClick={() => navigate('/admin')}
                     className="inline-flex items-center px-1 pt-1 text-gray-900 dark:text-gray-100"
@@ -64,7 +76,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center space-x-4">
               <ThemeToggle />
               <span className="text-gray-600 dark:text-gray-300">
-                Hola, {user?.name}
+                Hola, {user?.userWithoutPassword.NombreCompleto}
               </span>
               <button
                 onClick={logout}

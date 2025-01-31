@@ -2,8 +2,19 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 interface TokenPayload {
-  userId: number;
-  role: string;
+  userWithoutPassword: {
+    Email: string;
+    EstadoID: number;
+    FechaCreacion: string;
+    FechaModificacion: string | null;
+    NombreCompleto: string;
+    RoleID: number;
+    Telefono: number;
+    UserID: number;
+    Usuario: string;
+    UsuarioCreaID: number;
+    UsuarioModificaID: number | null;
+  };
 }
 
 declare global {
@@ -25,6 +36,11 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as TokenPayload;
     req.user = decoded;
+
+    if (req.user.userWithoutPassword.EstadoID !== 1) {
+      return res.status(403).json({ message: 'User is not active' });
+    }
+
     next();
   } catch (error) {
     return res.status(403).json({ message: 'Invalid token' });
@@ -32,7 +48,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 };
 
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (req.user?.role !== 'admin') {
+  if (req.user?.userWithoutPassword.RoleID !== 1) {
     return res.status(403).json({ message: 'Admin access required' });
   }
   next();

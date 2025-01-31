@@ -1,10 +1,19 @@
 export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'user';
-  active: boolean;
-  createdAt: string;
+  UserID: number;
+  Usuario: string;
+  NombreCompleto: string;
+  Telefono: string;
+  PasswordHash: string;
+  Email: string;
+  RoleID: number;
+  EstadoID: number;
+  FechaCreacion: Date;
+  UsuarioCreaID?: number;
+  FechaModificacion?: Date;
+  UsuarioModificaID?: number;
+  RoleNombreRol: string;
+  RoleDescripcion?: string;
+  EstadoDescripcion: string;
 }
 
 export interface Product {

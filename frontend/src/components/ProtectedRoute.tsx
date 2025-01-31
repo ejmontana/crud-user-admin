@@ -2,16 +2,28 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {jwtDecode} from 'jwt-decode';
 
+interface DecodedToken {
+  exp: number;
+  iat: number;
+  userWithoutPassword: {
+    Email: string;
+    EstadoID: number;
+    FechaCreacion: string;
+    FechaModificacion: string | null;
+    NombreCompleto: string;
+    RoleID: number;
+    Telefono: number;
+    UserID: number;
+    Usuario: string;
+    UsuarioCreaID: number;
+    UsuarioModificaID: number | null;
+  };
+}
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
 }
 
-interface DecodedToken {
-  userId: number;
-  role: string;
-  exp: number;
-}
 
 export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
   const { token, loading } = useAuth();
@@ -34,7 +46,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     return <Navigate to="/login" />;
   }
 
-  if (requireAdmin && user.role !== 'admin') {
+  if (requireAdmin && user.userWithoutPassword.RoleID !== 1) {
     return <Navigate to="/" />;
   }
 
