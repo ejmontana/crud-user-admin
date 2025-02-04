@@ -129,7 +129,6 @@ async login(req: Request, res: Response) {
     const result = await pool.request()
       .input('email', Email)
       .query('SELECT * FROM Usuarios WHERE Email = @email');
-    console.log(result.recordset[0])
     const user = result.recordset[0] as UsuarioDetalle;
 
     if (!user) {

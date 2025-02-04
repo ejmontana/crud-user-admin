@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { pool } from '../config/database';
 
 interface TokenPayload {
   userWithoutPassword: {
@@ -25,7 +26,7 @@ declare global {
   }
 }
 
-export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -37,8 +38,14 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as TokenPayload;
     req.user = decoded;
 
-    if (req.user.userWithoutPassword.EstadoID !== 1) {
-      return res.status(403).json({ message: 'User is not active' });
+    const result = await pool.request()
+    .input('userId', req.user?.userWithoutPassword.UserID)
+    .query('SELECT TOP 1  EstadoID FROM Usuarios WHERE UserID = @userId');
+  
+    const user = result.recordset[0];
+
+    if (user.EstadoID !== 1) {
+      return res.status(403).json({ message: 'El usuario no esta activo' });
     }
 
     next();
@@ -47,9 +54,15 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
   }
 };
 
-export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (req.user?.userWithoutPassword.RoleID !== 1) {
-    return res.status(403).json({ message: 'Admin access required' });
+export const requireAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  const result = await pool.request()
+  .input('userId', req.user?.userWithoutPassword.UserID)
+  .query('SELECT TOP 1  RoleID FROM Usuarios WHERE UserID = @userId');
+
+  const user = result.recordset[0];
+
+  if (user.RoleID !== 1) {
+    return res.status(403).json({ message: 'El usuario no tiene permisos' });
   }
   next();
 };

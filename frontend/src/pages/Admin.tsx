@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import moment from 'moment';
+import LoadingSpinner from '../components/Loading';
 
 const MySwal = withReactContent(Swal);
 
@@ -36,7 +37,7 @@ export function Admin() {
   const [showProductForm, setShowProductForm] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
   const { token } = useAuth();
-
+  const [loading, setLoading] = useState(false); 
   const [allUser, setAllUser] = useState([]);
 
   const [errorField, setErrorField] = useState('');
@@ -63,6 +64,7 @@ export function Admin() {
 
   const handleSubmitUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setErrorField('');
     const formData = new FormData(e.target as HTMLFormElement);
     const data = {
@@ -125,7 +127,7 @@ export function Admin() {
       console.error('Error:', error);
       MySwal.fire({
         title: 'Error',
-        text: 'Error creating/updating user',
+        text: editingUser ? 'Error Actualizando el usuario' : 'Error Creando el usuario',
         icon: 'error',
         confirmButtonText: 'Cerrar',
         customClass: {
@@ -133,12 +135,15 @@ export function Admin() {
           popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
         }
       });
+    }finally{
+      setLoading(false);
     }
   };
   
 
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
       const response = await fetch('http://localhost:3030/api/users/alluser', {
         headers: {
@@ -146,7 +151,7 @@ export function Admin() {
         }
       });
       if (!response.ok) {
-        throw new Error('Error fetching users');
+        throw new Error('Usuario no autorizado');
       }
       const data = await response.json();
       setAllUser(data);
@@ -154,7 +159,7 @@ export function Admin() {
       console.error('Error:', error);
       MySwal.fire({
         title: 'Error',
-        text: 'Error fetching users',
+        text: 'Usuario no autorizado',
         icon: 'error',
         confirmButtonText: 'Close',
         customClass: {
@@ -162,6 +167,8 @@ export function Admin() {
           popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors'
         }
       });
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -171,6 +178,7 @@ export function Admin() {
   return (
     <Layout>
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
+      {loading && <LoadingSpinner />}
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
