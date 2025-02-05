@@ -135,7 +135,6 @@ async login(req: Request, res: Response) {
       return res.status(401).json({ message: 'Invalid credentials', status: 401 });
     }
 
-    // Check if the user is active
     if (user.EstadoID !== 1) {
       return res.status(403).json({ message: 'User is not active', status: 403 });
     }
@@ -197,7 +196,7 @@ async getAllUsers(req: Request, res: Response) {
 
       res.json(result.recordset);
   } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error(error);
       res.status(500).json({ message: 'Error fetching users', error: error.message });
   }
 },
@@ -333,15 +332,16 @@ async deleteUser(req: Request, res: Response) {
   try {
     const result = await pool.request()
       .input('id', req.params.id)
-      .query('DELETE FROM Users WHERE id = @id');
+      .query('DELETE FROM Usuarios WHERE UserID = @id');
 
     if (result.rowsAffected[0] === 0) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'Usuarios no encontrado' });
     }
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Error deleting user', error });
+    console.log(error)
+    res.status(500).json({ message: 'Error al eliminar usuario', error });
   }
 }
 };

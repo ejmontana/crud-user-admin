@@ -37,7 +37,7 @@ export function Admin() {
   const [showProductForm, setShowProductForm] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
   const { token } = useAuth();
-  const [loading, setLoading] = useState(false); 
+  const [loading, setLoading] = useState(false);
   const [allUser, setAllUser] = useState([]);
 
   const [errorField, setErrorField] = useState('');
@@ -79,12 +79,12 @@ export function Admin() {
       FechaModificacion: editingUser ? new Date().toISOString() : null,
       UsuarioModificaID: editingUser ? user.userWithoutPassword.UserID : null
     };
-  
+
     const url = editingUser
       ? `http://localhost:3030/api/users/${editingUser.UserID}`
       : 'http://localhost:3030/api/users/register';
     const method = editingUser ? 'PUT' : 'POST';
-  
+
     try {
       const response = await fetch(url, {
         method,
@@ -97,7 +97,7 @@ export function Admin() {
         if (errorData.message?.includes('El Usuario esta en uso')) setErrorField('Usuario');
         MySwal.fire({
           title: 'Validaciones',
-          text: errorData.message || 'Error creating/updating user',
+          text: errorData.message || editingUser ? 'Error Actualizando el usuario' : 'Error Creando el usuario',
           icon: 'error',
           confirmButtonText: 'Cerrar',
           customClass: {
@@ -135,11 +135,11 @@ export function Admin() {
           popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
         }
       });
-    }finally{
+    } finally {
       setLoading(false);
     }
   };
-  
+
 
 
   const fetchUsers = async () => {
@@ -171,14 +171,73 @@ export function Admin() {
       setLoading(false);
     }
   };
-  
+
+  const deleteUser = async (idUser: number) => {
+    const result = await MySwal.fire({
+        title: '¿Está seguro?',
+        text: 'No podrá revertir esta acción',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        customClass: {
+            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+            cancelButton: 'bg-gray-600 text-white rounded-md hover:bg-gray-700',
+            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+        }
+    });
+
+    if (result.isConfirmed) {
+        setLoading(true);
+        try {
+          const response = await fetch(`http://localhost:3030/api/users/${idUser}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (!response.ok) {
+          throw new Error('Error al eliminar el usuario');
+        }
+            MySwal.fire({
+                title: 'Eliminado',
+                text: 'El usuario ha sido eliminado.',
+                icon: 'success',
+                confirmButtonText: 'Cerrar',
+                customClass: {
+                    confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+                    popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+                }
+            });
+    
+            fetchUsers();
+        } catch (error) {
+            console.error('Error al eliminar el usuario:', error);
+            MySwal.fire({
+                title: 'Error',
+                text: 'Hubo un problema al eliminar el usuario.',
+                icon: 'error',
+                confirmButtonText: 'Cerrar',
+                customClass: {
+                    confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+                    popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+                }
+            });
+        } finally {
+            setLoading(false);
+        }
+    }
+}
+
+
   useEffect(() => {
     fetchUsers();
   }, []);
   return (
     <Layout>
       <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors">
-      {loading && <LoadingSpinner />}
+        {loading && <LoadingSpinner />}
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -188,8 +247,8 @@ export function Admin() {
               <button
                 onClick={() => { setShowProductForm(false); setView('users') }}
                 className={`inline-flex items-center px-4 py-2 rounded-md transition-colors ${view === 'users'
-                    ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                   }`}
               >
                 <UserCog className="w-4 h-4 mr-2" />
@@ -198,8 +257,8 @@ export function Admin() {
               <button
                 onClick={() => { setShowUserForm(false); setView('products') }}
                 className={`inline-flex items-center px-4 py-2 rounded-md transition-colors ${view === 'products'
-                    ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  ? 'bg-indigo-600 dark:bg-indigo-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                   }`}
               >
                 <Package2 className="w-4 h-4 mr-2" />
@@ -286,122 +345,120 @@ export function Admin() {
           </form>
         )}
 
-{showUserForm && (
-  <form onSubmit={handleSubmitUser} className="mb-6 p-4 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700">
-  <div className="grid grid-cols-1 gap-4">
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Usuario
-      </label>
-      <input
-        type="text"
-        name="Usuario"
-        defaultValue={editingUser?.Usuario || ''}
-        maxLength={50}
-        required
-        className={`mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white ${
-          errorField === 'Usuario' ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
-        }`}
-      />
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Nombre Completo
-      </label>
-      <input
-        type="text"
-        name="NombreCompleto"
-        defaultValue={editingUser?.NombreCompleto || ''}
-        maxLength={300}
-        required
-        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
-      />
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Teléfono
-      </label>
-      <input
-        type="number"
-        name="Telefono"
-        defaultValue={editingUser?.Telefono || ''}
-        maxLength={15}
-        required
-        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
-      />
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Email
-      </label>
-      <input
-        type="email"
-        name="Email"
-        defaultValue={editingUser?.Email || ''}
-        maxLength={50}
-        required
-        className={`mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white ${
-          errorField === 'Email' ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
-        }`}
-      />
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Password
-      </label>
-      <input
-        type="password"
-        name="Password"
- 
-        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
-      />
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Rol
-      </label>
-      <select
-        name="RoleID"
-        defaultValue={editingUser?.RoleID || '1'}
-        required
-        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
-      >
-        <option value="1">Administrador</option>
-        <option value="2">Usuario</option>
-      </select>
-    </div>
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Estado
-      </label>
-      <select
-        name="EstadoID"
-        defaultValue={editingUser?.EstadoID || '1'}
-        required
-        className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
-      >
-        <option value="1">Activo</option>
-        <option value="2">Inactivo</option>
-      </select>
-    </div>
-  </div>
-  <div className="mt-4 flex justify-end space-x-2">
-    <button
-      type="button"
-      onClick={() => setShowUserForm(false)}
-      className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-    >
-      Cancelar
-    </button>
-    <button
-      type="submit"
-      className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors"
-    >
-      Guardar
-    </button>
-  </div>
-</form>
-      )}
+        {showUserForm && (
+          <form onSubmit={handleSubmitUser} className="mb-6 p-4 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700">
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Usuario
+                </label>
+                <input
+                  type="text"
+                  name="Usuario"
+                  defaultValue={editingUser?.Usuario || ''}
+                  maxLength={50}
+                  required
+                  className={`mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white ${errorField === 'Usuario' ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Nombre Completo
+                </label>
+                <input
+                  type="text"
+                  name="NombreCompleto"
+                  defaultValue={editingUser?.NombreCompleto || ''}
+                  maxLength={300}
+                  required
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Teléfono
+                </label>
+                <input
+                  type="number"
+                  name="Telefono"
+                  defaultValue={editingUser?.Telefono || ''}
+                  maxLength={15}
+                  required
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  name="Email"
+                  defaultValue={editingUser?.Email || ''}
+                  maxLength={50}
+                  required
+                  className={`mt-1 block w-full rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white ${errorField === 'Email' ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  name="Password"
+
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Rol
+                </label>
+                <select
+                  name="RoleID"
+                  defaultValue={editingUser?.RoleID || '1'}
+                  required
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                >
+                  <option value="1">Administrador</option>
+                  <option value="2">Usuario</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Estado
+                </label>
+                <select
+                  name="EstadoID"
+                  defaultValue={editingUser?.EstadoID || '1'}
+                  required
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                >
+                  <option value="1">Activo</option>
+                  <option value="2">Inactivo</option>
+                </select>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowUserForm(false)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors"
+              >
+                Guardar
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="overflow-x-auto">
           {view === 'products' ? (
@@ -534,16 +591,16 @@ export function Admin() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.NombreRol === "Administrador"
-                          ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                          : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                         }`}>
                         {user.NombreRol}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.EstadoDescripcion === "Activo"
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                         }`}>
                         {user.EstadoDescripcion === "Activo" ? (
                           <Check className="w-4 h-4 mr-1" />
@@ -578,6 +635,7 @@ export function Admin() {
                       </button>
                       <button
                         className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                        onClick={() => deleteUser(user.UserID)}
                       >
                         <Trash className="w-4 h-4" />
                       </button>

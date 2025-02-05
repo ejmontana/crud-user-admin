@@ -12,7 +12,8 @@ router.get('/alluser', authenticateToken, requireAdmin, userController.getAllUse
 router.get('/:id', authenticateToken, userController.getUserById);
 router.put('/:id', authenticateToken, userController.updateUser);
 router.delete('/:id', authenticateToken, requireAdmin, userController.deleteUser);
-router.post('/register', authenticateToken, requireAdmin,userController.register);
+router.post('/register', authenticateToken, requireAdmin, userController.register);
+
 
 
 export default router;
