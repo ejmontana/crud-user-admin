@@ -3,9 +3,10 @@ import { pool } from '../config/database';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { UsuarioDetalle } from '../types/user';
-
-
+import bcrypt from 'bcrypt';
+const saltRounds = 10;
 export const userController = {
+  
 async register(req: Request, res: Response) {
   try {
     const {
@@ -73,8 +74,8 @@ async register(req: Request, res: Response) {
     return res.status(400).json({ message: 'El Usuario está en uso', status: 400 });
   }
 
-    const hashedPassword = crypto.createHash('sha256').update(PasswordHash).digest();
-
+    
+    const hashedPassword = await bcrypt.hash(PasswordHash, saltRounds);
     const result = await pool.request()
       .input('Usuario', Usuario)
       .input('NombreCompleto', NombreCompleto)
@@ -217,6 +218,7 @@ async getUserById(req: Request, res: Response) {
   }
 },
 
+
 async updateUser(req: Request, res: Response) {
   try {
     const {
@@ -235,45 +237,10 @@ async updateUser(req: Request, res: Response) {
       .input('UserID', req.params.id)
       .query('SELECT TOP 1 Email FROM Usuarios WHERE Email = @Email AND UserID != @UserID');
 
-      if (existingEmail.recordset.length > 0) {
-        return res.status(400).json({ message: 'El Email esta en uso', status: 400 });
-      }
-  
-      if (!Usuario || !NombreCompleto || !Telefono || !Email || !RoleID) {
-        return res.status(400).json({ message: 'Todos los campos requeridos deben estar presentes', status: 400 });
-      }
-      
-      if (Usuario.length > 50) {
-        return res.status(400).json({ message: 'El campo Usuario no debe exceder 50 caracteres', status: 400 });
-      }
-      if (NombreCompleto.length > 300) {
-        return res.status(400).json({ message: 'El campo NombreCompleto no debe exceder 300 caracteres', status: 400 });
-      }
-      if (Email.length > 50) {
-        return res.status(400).json({ message: 'El campo Email no debe exceder 50 caracteres', status: 400 });
-      }
-      if (PasswordHash.length > 30) {
-        return res.status(400).json({ message: 'El campo Clave no debe exceder 256 caracteres', status: 400 });
-      }
-      if (PasswordHash && PasswordHash.length < 5) {
-        return res.status(400).json({ message: 'El campo Clave no debe ser menor a 5 caracteres', status: 400 });
-      }
-      
-      if (Telefono.length > 15) {
-        return res.status(400).json({ message: 'El campo Teléfono no debe exceder 15 numeros', status: 400 });
-      }
-  
-  
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(Email)) {
-        return res.status(400).json({ message: 'Formato de Email inválido', status: 400 });
-      }
-  
-      if (!/^\d{1,15}$/.test(Telefono.toString())) {
-        return res.status(400).json({ message: 'Formato de Teléfono inválido', status: 400 });
-      }
+    if (existingEmail.recordset.length > 0) {
+      return res.status(400).json({ message: 'El Email esta en uso', status: 400 });
+    }
 
-   
     const existingUsuario = await pool.request()
       .input('Usuario', Usuario)
       .input('UserID', req.params.id)
@@ -308,7 +275,7 @@ async updateUser(req: Request, res: Response) {
       .input('UsuarioModificaID', UsuarioModificaID);
 
     if (PasswordHash) {
-      const hashedPassword = crypto.createHash('sha256').update(PasswordHash).digest();
+      const hashedPassword = await bcrypt.hash(PasswordHash, saltRounds);
       query += `, PasswordHash = @PasswordHash`;
       request.input('PasswordHash', hashedPassword);
     }
