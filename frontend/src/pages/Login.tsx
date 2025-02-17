@@ -53,7 +53,7 @@ export function Login() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">Password</label>
+              <label htmlFor="password" className="sr-only">PaDssword</label>
               <input
                 id="password"
                 name="password"

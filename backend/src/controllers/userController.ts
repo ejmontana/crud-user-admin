@@ -130,21 +130,22 @@ async login(req: Request, res: Response) {
     const result = await pool.request()
       .input('email', Email)
       .query('SELECT * FROM Usuarios WHERE Email = @email');
+    console.log(result.recordset[0])
     const user = result.recordset[0] as UsuarioDetalle;
 
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials', status: 401 });
+      return res.status(401).json({ message: 'Credenciales inválidas', status: 401 });
     }
 
+    // Verifica si el usuario está activo
     if (user.EstadoID !== 1) {
-      return res.status(403).json({ message: 'User is not active', status: 403 });
+      return res.status(403).json({ message: 'El usuario no está activo', status: 403 });
     }
 
-    const inputPasswordHash = crypto.createHash('sha256').update(inputPassword).digest('hex');
-    const storedPasswordHash = Buffer.from(user.PasswordHash).toString('hex');
+    const passwordMatch = await bcrypt.compare(inputPassword, user.PasswordHash);
 
-    if (inputPasswordHash !== storedPasswordHash) {
-      return res.status(401).json({ message: 'Invalid credentials', status: 401 });
+    if (!passwordMatch) {
+      return res.status(401).json({ message: 'Credenciales inválidas', status: 401 });
     }
 
     const { PasswordHash, ...userWithoutPassword } = user;
@@ -159,7 +160,7 @@ async login(req: Request, res: Response) {
     
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: 'Error during login', error });
+    return res.status(500).json({ message: 'Error durante el login', error });
   }
 },
 
@@ -299,7 +300,7 @@ async deleteUser(req: Request, res: Response) {
   try {
     const result = await pool.request()
       .input('id', req.params.id)
-      .query('DELETE FROM Users WHERE id = @id');
+      .query('DELETE FROM Usuarios WHERE UserId = @id');
 
     if (result.rowsAffected[0] === 0) {
       return res.status(404).json({ message: 'User not found' });

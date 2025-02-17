@@ -171,6 +171,73 @@ export function Admin() {
       setLoading(false);
     }
   };
+
+  const deleteUser = async (userId: number) => {
+    if (userId === 1) {
+      MySwal.fire({
+        title: 'Acción no permitida',
+        text: 'No se puede eliminar el usuario root',
+        icon: 'error',
+        confirmButtonText: 'Cerrar',
+        customClass: {
+          confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+          popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+        }
+      });
+      return;
+    }
+  
+    const result = await MySwal.fire({
+      title: '¿Estás seguro?',
+      text: 'No podrás revertir esto',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+        cancelButton: 'bg-gray-600 text-white rounded-md hover:bg-gray-700',
+        popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+      }
+    });
+  
+    if (result.isConfirmed) {
+      try {
+        const response = await fetch(`http://localhost:3030/api/users/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!response.ok) {
+          throw new Error('Error deleting user');
+        }
+        MySwal.fire({
+          title: 'Usuario eliminado',
+          text: 'El usuario ha sido eliminado correctamente',
+          icon: 'success',
+          confirmButtonText: 'Cerrar',
+          customClass: {
+            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+          }
+        });
+        fetchUsers();
+      } catch (error) {
+        console.error('Error:', error);
+        MySwal.fire({
+          title: 'Error',
+          text: 'Error eliminando el usuario',
+          icon: 'error',
+          confirmButtonText: 'Cerrar',
+          customClass: {
+            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+          }
+        });
+      }
+    }
+  };
   
   useEffect(() => {
     fetchUsers();
@@ -578,7 +645,8 @@ export function Admin() {
                       </button>
                       <button
                         className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
-                      >
+                        onClick={() => deleteUser(user.UserID)}
+                        >
                         <Trash className="w-4 h-4" />
                       </button>
                     </td>
