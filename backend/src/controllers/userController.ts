@@ -198,7 +198,7 @@ async getAllUsers(req: Request, res: Response) {
 
       res.json(result.recordset);
   } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error(error);
       res.status(500).json({ message: 'Error fetching users', error: error.message });
   }
 },
@@ -300,15 +300,16 @@ async deleteUser(req: Request, res: Response) {
   try {
     const result = await pool.request()
       .input('id', req.params.id)
-      .query('DELETE FROM Usuarios WHERE UserId = @id');
+      .query('DELETE FROM Usuarios WHERE UserID = @id');
 
     if (result.rowsAffected[0] === 0) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'Usuarios no encontrado' });
     }
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Error deleting user', error });
+    console.log(error)
+    res.status(500).json({ message: 'Error al eliminar usuario', error });
   }
 }
 };
