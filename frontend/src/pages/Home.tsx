@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Layout } from '../components/Layout';
 import ProductCard from '../components/ProductCard';
 import { Filter, ChevronDown } from 'lucide-react';
+import Chatbot from '../components/Chatbot';
+import LocationFeatures from '../components/LocationFeatures';
 
 export function Home() {
   const [sortBy, setSortBy] = useState('featured');
@@ -52,7 +54,7 @@ export function Home() {
           </div>
         </div>
       </section>
-
+      <LocationFeatures />
       {/* Featured Products */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex justify-between items-center mb-8">
@@ -98,6 +100,8 @@ export function Home() {
           </div>
         </div>
       </section>
+
+      <Chatbot />
     </Layout>
   );
 }
