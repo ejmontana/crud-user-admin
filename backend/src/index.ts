@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { connectDB } from './config/database';
 import userRoutes from './routes/userRoutes';
+import chatRoutes from './routes/chatRoutes';
 
 dotenv.config();
 
@@ -19,7 +20,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/users', userRoutes);
-
+app.use('/api/chat', chatRoutes);
 // Database connection
 connectDB().then(() => {
   app.listen(port, () => {
