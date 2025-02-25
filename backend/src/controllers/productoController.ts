@@ -4,31 +4,54 @@ import { ProductoDetalle } from '../types/producto';
 import path from 'path';
 import fs from 'fs';
 
+declare module 'express-serve-static-core' {
+  interface Request {
+    file?: {
+      filename: string;
+    };
+  }
+}
 export const productoController = {
   
   async createProducto(req: Request, res: Response) {
     try {
-      const { Nombre, Descripcion, Precio, Stock }: ProductoDetalle = req.body;
-      const Imagen = req.file ? `/uploads/${req.file.filename}` : null;
-
-      if (!Nombre || !Precio || Stock === undefined) {
-        return res.status(400).json({ message: 'Todos los campos requeridos deben estar presentes', status: 400 });
+      const { Nombre, Descripcion, Precio, Stock, UsuarioCreaID }: ProductoDetalle = req.body;
+      
+      // Validación de campos requeridos y sus tipos
+      if (!Nombre || typeof Nombre !== 'string') {
+        return res.status(400).json({ message: 'El campo Nombre es requerido y debe ser una cadena de texto', status: 400 });
       }
-
+      if (Precio === undefined || isNaN(Number(Precio))) {
+        return res.status(400).json({ message: 'El campo Precio es requerido y debe ser un número', status: 400 });
+      }
+      if (Stock === undefined || isNaN(Number(Stock))) {
+        return res.status(400).json({ message: 'El campo Stock es requerido y debe ser un número', status: 400 });
+      }
+      if (!UsuarioCreaID || isNaN(Number(UsuarioCreaID))) {
+        return res.status(400).json({ message: 'El campo UsuarioCreaID es requerido y debe ser un número', status: 400 });
+      }
+  
+      // Si se subió un archivo, se asume que Multer lo ha guardado en la carpeta "uploads"
+      // Se construye la URL completa del recurso, por ejemplo:
+      const Imagen = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : null;
+  
       const result = await pool.request()
         .input('Nombre', Nombre)
-        .input('Descripcion', Descripcion)
+        .input('Descripcion', Descripcion || null)
         .input('Precio', Precio)
         .input('Stock', Stock)
-        .input('Imagen', Imagen)
+        .input('EstadoID', 1)
+        .input('UsuarioCreaID', UsuarioCreaID)
+        .input('FechaCreacion', new Date())
+        .input('ImagenURL', Imagen)
         .query(`
-          INSERT INTO Productos (Nombre, Descripcion, Precio, Stock, Imagen)
-          VALUES (@Nombre, @Descripcion, @Precio, @Stock, @Imagen);
+          INSERT INTO Productos (Nombre, Descripcion, Precio, Stock, EstadoID, UsuarioCreaID, FechaCreacion, ImagenURL)
+          VALUES (@Nombre, @Descripcion, @Precio, @Stock, @EstadoID, @UsuarioCreaID, @FechaCreacion, @ImagenURL);
         `);
-
+  
       return res.status(201).json({ message: 'Producto creado exitosamente', status: 201 });
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Error creando producto', error, status: 500 });
     }
   },

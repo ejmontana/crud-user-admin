@@ -17,12 +17,17 @@ export interface User {
 }
 
 export interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-  stock: number;
+  ProductoID: number;
+  Nombre: string;
+  Descripcion: string;
+  Precio: number;
+  Stock: number;
+  EstadoID: number;
+  UsuarioCreaID: number;
+  FechaModificacion?: Date;
+  UsuarioModificaID?: number;
+  FechaCreacion: Date;
+  ImagenURL: string;
 }
 
 export interface Theme {

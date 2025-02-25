@@ -11,15 +11,16 @@ const storage = multer.diskStorage({
     cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+    const extension = path.extname(file.originalname);
+    cb(null, `${Date.now()}${extension}`);
   }
 });
 
 const upload = multer({ storage });
 
 // Protected routes
-router.post('/', authenticateToken, requireAdmin, upload.single('Imagen'), productoController.createProducto);
-router.get('/', authenticateToken, productoController.getAllProductos);
+router.post('/', upload.single('file'), productoController.createProducto);
+router.get('/', productoController.getAllProductos);
 router.get('/:id', authenticateToken, productoController.getProductoById);
 router.put('/:id', authenticateToken, requireAdmin, upload.single('Imagen'), productoController.updateProducto);
 router.delete('/:id', authenticateToken, requireAdmin, productoController.deleteProducto);

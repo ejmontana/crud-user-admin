@@ -39,7 +39,7 @@ export function Admin() {
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
   const [allUser, setAllUser] = useState([]);
-
+  const [productsList, setProductsList] = useState<Product[]>([]); // Para refrescar la lista de productos
   const [errorField, setErrorField] = useState('');
 
 
@@ -55,12 +55,75 @@ export function Admin() {
     }
   }
 
-  const handleSubmitProduct = (e: React.FormEvent) => {
+  const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowProductForm(false);
-    setEditingProduct(null);
-  };
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
 
+
+    if (user) {
+      formData.append('UsuarioCreaID', user.userWithoutPassword.UserID.toString());
+    }
+
+
+    const url = editingProduct
+      ? `http://localhost:3030/api/productos/${editingProduct.id}`
+      : 'http://localhost:3030/api/productos';
+    const method = editingProduct ? 'PUT' : 'POST';
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          // No se agrega Content-Type ya que FormData establece sus propios boundaries
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        MySwal.fire({
+          title: 'Error',
+          text: errorData.message || (editingProduct ? 'Error actualizando producto' : 'Error creando producto'),
+          icon: 'error',
+          confirmButtonText: 'Cerrar',
+          customClass: {
+            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+          }
+        });
+        return;
+      }
+      const result = await response.json();
+      MySwal.fire({
+        title: editingProduct ? 'Actualizado' : 'Creado',
+        text: editingProduct ? 'Producto actualizado correctamente' : 'Producto creado correctamente',
+        icon: 'success',
+        confirmButtonText: 'Cerrar',
+        customClass: {
+          confirmButton: 'bg-green-600 text-white rounded-md hover:bg-green-700',
+          popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+        }
+      });
+      setShowProductForm(false);
+      setEditingProduct(null);
+      // Opcional: refrescar la lista de productos
+      // fetchProducts();
+    } catch (error) {
+      console.error(error);
+      MySwal.fire({
+        title: 'Error',
+        text: editingProduct ? 'Error actualizando producto' : 'Error creando producto',
+        icon: 'error',
+        confirmButtonText: 'Cerrar',
+        customClass: {
+          confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+          popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+        }
+      });
+    }
+  };
 
   const handleSubmitUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,65 +237,84 @@ export function Admin() {
 
   const deleteUser = async (idUser: number) => {
     const result = await MySwal.fire({
-        title: '¿Está seguro?',
-        text: 'No podrá revertir esta acción',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar',
-        customClass: {
-            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
-            cancelButton: 'bg-gray-600 text-white rounded-md hover:bg-gray-700',
-            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
-        }
+      title: '¿Está seguro?',
+      text: 'No podrá revertir esta acción',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+        cancelButton: 'bg-gray-600 text-white rounded-md hover:bg-gray-700',
+        popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+      }
     });
 
     if (result.isConfirmed) {
-        setLoading(true);
-        try {
-          const response = await fetch(`http://localhost:3030/api/users/${idUser}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            }
+      setLoading(true);
+      try {
+        const response = await fetch(`http://localhost:3030/api/users/${idUser}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
         });
         if (!response.ok) {
           throw new Error('Error al eliminar el usuario');
         }
-            MySwal.fire({
-                title: 'Eliminado',
-                text: 'El usuario ha sido eliminado.',
-                icon: 'success',
-                confirmButtonText: 'Cerrar',
-                customClass: {
-                    confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
-                    popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
-                }
-            });
-    
-            fetchUsers();
-        } catch (error) {
-            console.error('Error al eliminar el usuario:', error);
-            MySwal.fire({
-                title: 'Error',
-                text: 'Hubo un problema al eliminar el usuario.',
-                icon: 'error',
-                confirmButtonText: 'Cerrar',
-                customClass: {
-                    confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
-                    popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
-                }
-            });
-        } finally {
-            setLoading(false);
-        }
-    }
-}
+        MySwal.fire({
+          title: 'Eliminado',
+          text: 'El usuario ha sido eliminado.',
+          icon: 'success',
+          confirmButtonText: 'Cerrar',
+          customClass: {
+            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+          }
+        });
 
+        fetchUsers();
+      } catch (error) {
+        console.error('Error al eliminar el usuario:', error);
+        MySwal.fire({
+          title: 'Error',
+          text: 'Hubo un problema al eliminar el usuario.',
+          icon: 'error',
+          confirmButtonText: 'Cerrar',
+          customClass: {
+            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+          }
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:3030/api/productos', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('Error al obtener los productos');
+      }
+      const data = await response.json();
+      setProductsList(data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchUsers();
+    fetchProducts();
   }, []);
   return (
     <Layout>
@@ -283,8 +365,8 @@ export function Admin() {
           </button>
         </div>
 
-        {showProductForm && (
-          <form onSubmit={handleSubmitProduct} className="mb-6 p-4 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700">
+        {showProductForm && view === 'products' && (
+          <form onSubmit={handleSubmitProduct} className="mb-6 p-4 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700" encType="multipart/form-data">
             <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -292,8 +374,10 @@ export function Admin() {
                 </label>
                 <input
                   type="text"
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                  name="Nombre"
                   defaultValue={editingProduct?.name}
+                  required
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
                 />
               </div>
               <div>
@@ -301,8 +385,9 @@ export function Admin() {
                   Descripción
                 </label>
                 <textarea
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                  name="Descripcion"
                   defaultValue={editingProduct?.description}
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
                 />
               </div>
               <div>
@@ -312,8 +397,10 @@ export function Admin() {
                 <input
                   type="number"
                   step="0.01"
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                  name="Precio"
                   defaultValue={editingProduct?.price}
+                  required
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
                 />
               </div>
               <div>
@@ -322,8 +409,21 @@ export function Admin() {
                 </label>
                 <input
                   type="number"
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                  name="Stock"
                   defaultValue={editingProduct?.stock}
+                  required
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Imagen
+                </label>
+                <input
+                  type="file"
+                  name="file"
+                  accept="image/*"
+                  className="mt-1 block w-full text-gray-700 dark:text-gray-300"
                 />
               </div>
             </div>
@@ -462,70 +562,71 @@ export function Admin() {
 
         <div className="overflow-x-auto">
           {view === 'products' ? (
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Producto
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Precio
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Stock
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0">
-                          <img
-                            className="h-10 w-10 rounded-full object-cover"
-                            src={product.image}
-                            alt=""
-                          />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {product.name}
-                          </div>
-                        </div>
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Producto
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Precio
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Stock
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Acciones
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {productsList.map((product) => (
+              <tr key={product.ProductoID}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 flex-shrink-0">
+                      <img
+                        className="h-10 w-10 rounded-full object-cover"
+                        src={product.ImagenURL}
+                        alt="Producto"
+                        crossOrigin="anonymous"
+                      />
+                    </div>
+                    <div className="ml-4">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {product.Nombre}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        ${product.price.toFixed(2)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {product.stock}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => {
-                          setEditingProduct(product);
-                          setShowProductForm(true);
-                        }}
-                        className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-4"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">
-                        <Trash className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    ${product.Precio.toFixed(2)}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900 dark:text-white">
+                    {product.Stock}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <button
+                    onClick={() => {
+                      setEditingProduct(product);
+                      setShowProductForm(true);
+                    }}
+                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-4"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">
+                    <Trash className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
           ) : (
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">

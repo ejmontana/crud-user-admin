@@ -1,36 +1,21 @@
 import { Request, Response } from 'express';
 import OpenAI from 'openai';
+import { pool } from '../config/database';
 
-export const products = [
-    {
-      id: 1,
-      name: 'PC Gamer',
-      description: 'Una potente PC para juegos con tarjeta gráfica de última generación.',
-      price: 1200,
-      available: true,
-    },
-    {
-      id: 2,
-      name: 'Laptop Ultrabook',
-      description: 'Una laptop ligera y potente para profesionales en movimiento.',
-      price: 900,
-      available: false,
-    },
-    {
-      id: 3,
-      name: 'Teclado Mecánico',
-      description: 'Teclado mecánico con retroiluminación RGB.',
-      price: 100,
-      available: true,
-    },
-    {
-      id: 4,
-      name: 'Servicio de Reparación',
-      description: 'Servicio de reparación y mantenimiento de computadoras.',
-      price: 50,
-      available: true,
-    },
-  ];
+interface Product {
+  ProductoID: number;
+  Nombre: string;
+  Descripcion: string;
+  Precio: number;
+  Stock: number;
+  EstadoID: number;
+  UsuarioCreaID: number;
+  FechaModificacion?: Date;
+  UsuarioModificaID?: number;
+  FechaCreacion: Date;
+  ImagenURL: string;
+}
+
 const openai = new OpenAI({
   baseURL: 'https://api.deepseek.com',
   apiKey: process.env.DEEPSEEK_API_KEY || '<DeepSeek API Key>',
@@ -45,10 +30,14 @@ export const chatController = {
       }
 
       // Crea una descripción de los productos para el prompt
+      const result = await pool.request().query('SELECT * FROM Productos');
+      const products: Product[] = result.recordset;
+
       const productDescriptions = products.map(product => {
-        return `${product.name}: ${product.description}, Precio: $${product.price}, Disponible: ${product.available ? 'Sí' : 'No'}`;
+        return `${product.Nombre}: ${product.Descripcion}, Precio: $${product.Precio}, Disponible: ${product.Stock > 0 ? 'Sí' : 'No'}`;
       }).join('\n');
 
+      console.log(productDescriptions);
       // Lógica de DeepSeek adaptada para tu chatbot
       const completion = await openai.chat.completions.create({
         model: 'deepseek-chat',

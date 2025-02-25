@@ -15,12 +15,17 @@ const port = process.env.PORT || 3030;
 
 // Middleware
 app.use(morgan('dev'));
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:5173'], // Agrega aquí los orígenes permitidos
+  methods: ['GET', 'POST', 'PUT', 'DELETE']
+}));
+
 app.use(helmet());
 app.use(express.json());
 
 // Routes
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/users', userRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/productos', productoRoutes);
