@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, Car, Train, User } from 'lucide-react';
+// import { google } from '@types/google.maps';
+import { MapPin, Navigation, Car, User } from 'lucide-react';
 import { Loader } from '@googlemaps/js-api-loader';
 
 interface Location {
@@ -30,10 +31,12 @@ const LocationFeatures: React.FC = () => {
   ];
 
   useEffect(() => {
+
+
     const initializeMap = async () => {
       try {
         const loader = new Loader({
-          apiKey: 'AIzaSyBjyRI-OmIC4YrfhbnQMZ1Ane54mFKg4WU', 
+          apiKey: import.meta.env.VITE_KEY_MAP, 
           version: "weekly",
           libraries: ["places"]
         });
@@ -84,7 +87,6 @@ const LocationFeatures: React.FC = () => {
           setMap(newMap);
           setDirectionsRenderer(newDirectionsRenderer);
 
-          // Marcador de la tienda
           new google.maps.Marker({
             position: STORE_LOCATION,
             map: newMap,
@@ -100,10 +102,11 @@ const LocationFeatures: React.FC = () => {
           });
         }
       } catch (err) {
+        console.error(err);
         setError("Error al cargar el mapa. Por favor, intenta más tarde.");
       }
     };
-
+    
     initializeMap();
   }, []);
 
@@ -134,6 +137,8 @@ const LocationFeatures: React.FC = () => {
             });
           }
         } catch (err) {
+        console.error(err);
+
           setError("Error al obtener la dirección");
         } finally {
           setLoading(false);
@@ -178,6 +183,8 @@ const LocationFeatures: React.FC = () => {
       
       setDirections(steps);
     } catch (err) {
+      console.error(err);
+
       setError("Error al obtener las indicaciones");
     }
   };

@@ -23,7 +23,7 @@ const Chatbot = () => {
     setInputValue('');
 
     // Mensaje de carga
-    const loadingMessage = { sender: 'bot', content: 'Procesando respuesta...' };
+    const loadingMessage: Message = { sender: 'bot', content: 'Procesando respuesta...' };
     setMessages(prev => [...prev, loadingMessage]);
     setIsLoading(true);
 

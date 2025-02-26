@@ -36,9 +36,9 @@ export function Home() {
             <p className="mt-4 text-lg text-gray-300">
               Nuestro equipo de expertos está disponible 24/7 para ayudarte con cualquier consulta
             </p>
-            <button className="mt-8 bg-white text-gray-900 px-8 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors">
+            {/* <button className="mt-8 bg-white text-gray-900 px-8 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors">
               Contactar Soporte
-            </button>
+            </button> */}
           </div>
         </div>
       </section>
