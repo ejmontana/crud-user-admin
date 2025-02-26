@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { Product } from '../types';
+import Chatbot from '../components/Chatbot';
 
 export function Productos() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -64,6 +65,7 @@ export function Productos() {
           </div>
         )}
       </div>
+      <Chatbot />
     </Layout>
   );
 }
