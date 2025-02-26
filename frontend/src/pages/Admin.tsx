@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
-import { products } from '../data/mock';
 import { Product, User } from '../types';
 import { Plus, Edit, Trash, UserCog, Package2, Check, X } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode';
@@ -9,7 +8,7 @@ import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import moment from 'moment';
 import LoadingSpinner from '../components/Loading';
-
+import * as XLSX from 'xlsx';
 const MySwal = withReactContent(Swal);
 
 interface DecodedToken {
@@ -29,6 +28,12 @@ interface DecodedToken {
     UsuarioModificaID: number | null;
   };
 }
+const exportToExcel = (data: any[], fileName: string) => {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+  XLSX.writeFile(workbook, `${fileName}.xlsx`);
+};
 
 export function Admin() {
   const [view, setView] = useState<'products' | 'users'>('users');
@@ -57,17 +62,22 @@ export function Admin() {
 
   const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     const form = e.target as HTMLFormElement;
     const formData = new FormData(form);
 
 
     if (user) {
-      formData.append('UsuarioCreaID', user.userWithoutPassword.UserID.toString());
+      if (!editingProduct) {
+        formData.append('UsuarioCreaID', user.userWithoutPassword.UserID.toString())
+      } else {
+        formData.append('UsuarioModificaID', user.userWithoutPassword.UserID.toString());
+      }
     }
 
 
     const url = editingProduct
-      ? `http://localhost:3030/api/productos/${editingProduct.id}`
+      ? `http://localhost:3030/api/productos/${editingProduct.ProductoID}`
       : 'http://localhost:3030/api/productos';
     const method = editingProduct ? 'PUT' : 'POST';
 
@@ -95,7 +105,7 @@ export function Admin() {
         });
         return;
       }
-      const result = await response.json();
+      //const result = await response.json();
       MySwal.fire({
         title: editingProduct ? 'Actualizado' : 'Creado',
         text: editingProduct ? 'Producto actualizado correctamente' : 'Producto creado correctamente',
@@ -108,10 +118,14 @@ export function Admin() {
       });
       setShowProductForm(false);
       setEditingProduct(null);
-      // Opcional: refrescar la lista de productos
-      // fetchProducts();
+
+      fetchProducts();
+      setLoading(false);
+
     } catch (error) {
       console.error(error);
+      setLoading(false);
+
       MySwal.fire({
         title: 'Error',
         text: editingProduct ? 'Error actualizando producto' : 'Error creando producto',
@@ -123,6 +137,8 @@ export function Admin() {
         }
       });
     }
+    fetchProducts();
+    setLoading(false);
   };
 
   const handleSubmitUser = async (e: React.FormEvent) => {
@@ -202,8 +218,6 @@ export function Admin() {
       setLoading(false);
     }
   };
-
-
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -292,6 +306,65 @@ export function Admin() {
       }
     }
   }
+
+  const deleteProduct = async (idProduct: number) => {
+    const result = await MySwal.fire({
+      title: '¿Está seguro?',
+      text: 'No podrá revertir esta acción',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      customClass: {
+        confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+        cancelButton: 'bg-gray-600 text-white rounded-md hover:bg-gray-700',
+        popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+      }
+    });
+
+    if (result.isConfirmed) {
+      setLoading(true);
+      try {
+        const response = await fetch(`http://localhost:3030/api/productos/${idProduct}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!response.ok) {
+          throw new Error('Error al eliminar el usuario');
+        }
+        MySwal.fire({
+          title: 'Eliminado',
+          text: 'El usuario ha sido eliminado.',
+          icon: 'success',
+          confirmButtonText: 'Cerrar',
+          customClass: {
+            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+          }
+        });
+
+        fetchProducts();
+      } catch (error) {
+        console.error('Error al eliminar el usuario:', error);
+        MySwal.fire({
+          title: 'Error',
+          text: 'Hubo un problema al eliminar el usuario.',
+          icon: 'error',
+          confirmButtonText: 'Cerrar',
+          customClass: {
+            confirmButton: 'bg-red-600 text-white rounded-md hover:bg-red-700',
+            popup: 'bg-white dark:bg-gray-800 shadow rounded-lg p-6 transition-colors dark:text-white'
+          }
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
   const fetchProducts = async () => {
     setLoading(true);
     try {
@@ -325,6 +398,7 @@ export function Admin() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
               Panel de Administración
             </h2>
+
             <div className="mt-4 space-x-4">
               <button
                 onClick={() => { setShowProductForm(false); setView('users') }}
@@ -348,21 +422,35 @@ export function Admin() {
               </button>
             </div>
           </div>
-          <button
-            onClick={() => {
-              if (view === 'products') {
-                setEditingProduct(null);
-                setShowProductForm(true);
-              } else {
-                setEditingUser(null);
-                setShowUserForm(true);
-              }
-            }}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Nuevo {view === 'products' ? 'Producto' : 'Usuario'}
-          </button>
+          <div className="mt-4 space-x-4">
+            <button
+              onClick={() => {
+                if (view === 'products') {
+                  exportToExcel(productsList, 'Productos');
+                } else {
+                  exportToExcel(allUser, 'Usuarios');
+                }
+              }}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 transition-colors"
+            >
+              Exportar {view === 'products' ? 'Productos' : 'Usuarios'}
+            </button>
+            <button
+              onClick={() => {
+                if (view === 'products') {
+                  setEditingProduct(null);
+                  setShowProductForm(true);
+                } else {
+                  setEditingUser(null);
+                  setShowUserForm(true);
+                }
+              }}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nuevo {view === 'products' ? 'Producto' : 'Usuario'}
+            </button>
+          </div>
         </div>
 
         {showProductForm && view === 'products' && (
@@ -375,7 +463,7 @@ export function Admin() {
                 <input
                   type="text"
                   name="Nombre"
-                  defaultValue={editingProduct?.name}
+                  defaultValue={editingProduct?.Nombre}
                   required
                   className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
                 />
@@ -386,7 +474,7 @@ export function Admin() {
                 </label>
                 <textarea
                   name="Descripcion"
-                  defaultValue={editingProduct?.description}
+                  defaultValue={editingProduct?.Descripcion}
                   className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
                 />
               </div>
@@ -398,7 +486,7 @@ export function Admin() {
                   type="number"
                   step="0.01"
                   name="Precio"
-                  defaultValue={editingProduct?.price}
+                  defaultValue={editingProduct?.Precio}
                   required
                   className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
                 />
@@ -410,7 +498,7 @@ export function Admin() {
                 <input
                   type="number"
                   name="Stock"
-                  defaultValue={editingProduct?.stock}
+                  defaultValue={editingProduct?.Stock}
                   required
                   className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white"
                 />
@@ -562,71 +650,73 @@ export function Admin() {
 
         <div className="overflow-x-auto">
           {view === 'products' ? (
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-700">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Producto
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Precio
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Stock
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {productsList.map((product) => (
-              <tr key={product.ProductoID}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 flex-shrink-0">
-                      <img
-                        className="h-10 w-10 rounded-full object-cover"
-                        src={product.ImagenURL}
-                        alt="Producto"
-                        crossOrigin="anonymous"
-                      />
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {product.Nombre}
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Producto
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Precio
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Stock
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {productsList.map((product) => (
+                  <tr key={product.ProductoID}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 flex-shrink-0">
+                          <img
+                            className="h-10 w-10 rounded-full object-cover"
+                            src={product.ImagenURL}
+                            alt="Producto"
+                            crossOrigin="anonymous"
+                          />
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {product.Nombre}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900 dark:text-white">
-                    ${product.Precio.toFixed(2)}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900 dark:text-white">
-                    {product.Stock}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => {
-                      setEditingProduct(product);
-                      setShowProductForm(true);
-                    }}
-                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-4"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300">
-                    <Trash className="w-4 h-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        ${product.Precio.toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {product.Stock}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => {
+                          setEditingProduct(product);
+                          setShowProductForm(true);
+                        }}
+                        className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300 mr-4"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                        onClick={() => deleteProduct(product.ProductoID)}
+                      >
+                        <Trash className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
