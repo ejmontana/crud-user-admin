@@ -84,41 +84,62 @@ export const productoController = {
 
   async updateProducto(req: Request, res: Response) {
     try {
-      const { Nombre, Descripcion, Precio, Stock }: ProductoDetalle = req.body;
-      const Imagen = req.file ? `/uploads/${req.file.filename}` : null;
-
+      const { Nombre, Descripcion, Precio, Stock, UsuarioModificaID }: ProductoDetalle = req.body;
+  
+      // Validación de campos requeridos y sus tipos
+      if (!Nombre || typeof Nombre !== 'string') {
+        return res.status(400).json({ message: 'El campo Nombre es requerido y debe ser una cadena de texto', status: 400 });
+      }
+      if (Precio === undefined || isNaN(Number(Precio))) {
+        return res.status(400).json({ message: 'El campo Precio es requerido y debe ser un número', status: 400 });
+      }
+      if (Stock === undefined || isNaN(Number(Stock))) {
+        return res.status(400).json({ message: 'El campo Stock es requerido y debe ser un número', status: 400 });
+      }
+      if (!UsuarioModificaID || isNaN(UsuarioModificaID)) {
+        return res.status(400).json({ message: 'El campo UsuarioModificaID es requerido y debe ser un número', status: 400 });
+      }
+  
+      // Si se subió un archivo, se asume que Multer lo ha guardado en la carpeta "uploads"
+      // Se construye la URL completa del recurso, por ejemplo:
+      const Imagen = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : null;
+  
       let query = `
         UPDATE Productos 
         SET 
           Nombre = @Nombre,
           Descripcion = @Descripcion,
           Precio = @Precio,
-          Stock = @Stock
+          Stock = @Stock,
+          UsuarioModificaID = @UsuarioModificaID,
+          FechaModificacion = @FechaModificacion
       `;
-
+  
       const request = pool.request()
         .input('ProductoID', req.params.id)
         .input('Nombre', Nombre)
-        .input('Descripcion', Descripcion)
+        .input('Descripcion', Descripcion || null)
         .input('Precio', Precio)
-        .input('Stock', Stock);
-
+        .input('Stock', Stock)
+        .input('UsuarioModificaID', UsuarioModificaID)
+        .input('FechaModificacion', new Date());
+  
       if (Imagen) {
-        query += `, Imagen = @Imagen`;
-        request.input('Imagen', Imagen);
+        query += `, ImagenURL = @ImagenURL`;
+        request.input('ImagenURL', Imagen);
       }
-
+  
       query += ` WHERE ProductoID = @ProductoID`;
-
+  
       const result = await request.query(query);
-
+  
       if (result.rowsAffected[0] === 0) {
         return res.status(404).json({ message: 'Producto no encontrado' });
       }
-
+  
       return res.json({ message: 'Producto actualizado exitosamente' });
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Error actualizando producto', error, status: 500 });
     }
   },
